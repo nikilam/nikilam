@@ -1,0 +1,380 @@
+- 👋 Hi, I’m @nikilam
+- 👀 I’m interested in ...
+- 🌱 I’m currently learning ...
+- 💞️ I’m looking to collaborate on ...
+- 📫 How to reach me ...
+
+<!---
+nikilam/nikilam is a ✨ special ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+You can click the Preview link to take a look at your changes.
+--->
+from turtle import bgcolor
+import requests
+import json
+from tkinter import Tk, Canvas, StringVar, Label, Radiobutton, Button, messagebox
+import html
+from random import shuffle
+import pickle
+import pygame
+from PIL import ImageTk,Image
+import threading
+import time 
+COLOR = "#000000"   #χρώμα γραμμάτων ερώτησης
+
+name=input("ΟΝΟΜΑ: ")
+
+diskolia=input("Επέλεξε: easy, medium, hard. Επιλογή: ")
+
+x=int(input('''1:General Knowledge
+2:Entertainment: Books
+3:Entertainment: Film
+4:Entertainment: Music
+5:Entertainment: Musicals & Theatres
+6:Entertainment: Television
+7:Entertainment: Video Games
+8:Entertainment: Board Games
+9:Science & Nature
+10:Science: Computers
+11:Science: Mathematics
+12:Mythology
+13:Sports
+14:Geography
+15:History
+16:Politics
+17:Art
+18:Celebrities
+19:Animals
+20:Vehicles
+21:Entertainment: Comics
+22:Science: Gadgets
+23:Entertainment: Japanese Anime & Manga
+24:Entertainment: Cartoon & Animations
+Επέλεξε από το 1 εώς το 24.
+Επιλογή: '''))
+
+#x=κατηγορία ερωτήσεων
+parameters= {
+    "difficulty": diskolia,
+    "category": x+8 #παίρνουμε τις παραμέτρους του χρήστη
+    }
+    
+#συνδεόμαστε με το API και λαμβάνουμε ερωτήσεις με βάση ό,τι επιλέχθηκε
+response = requests.get(url="https://opentdb.com/api.php?amount=9&type=multiple", params=parameters)
+
+question_data = response.json()["results"]  #τα αποτελέσματα του ΑΡΙ αποθηκεύονται σε αυτή τη μεταβλητή
+
+class Question: #κλάση ερώτηση
+    def __init__(self, question: str, correct_answer: str, choices: list):
+        self.question_text = question #ορίζω την ερώτηση
+        self.correct_answer = correct_answer #ορίζω την απάντηση
+        self.choices = choices #ορίζω τις επιλογές του χρήστη και τις κάνω λίστα
+        
+class Quiz:
+    def __init__(self, questions):# παίρνει τη λίστα questions
+        self.question_no = 0 #ορίζεται 0 ο α/α ερώτησης
+        self.score = 0 #ορίζεται το σκορ 0
+        self.questions = questions
+        self.current_question = None
+
+    def has_more_questions(self):
+        
+        #ελέγχω αν έχει άλλες ερωτήσεις        
+        return self.question_no < len(self.questions)
+    def has_no_more_questions(self):
+        
+        #ελέγχω αν έχει άλλες ερωτήσεις        
+        return self.question_no > 1
+
+    def next_question(self):
+        #παίρνω την ερώτηση απο λίστα
+        self.current_question = self.questions[self.question_no]
+        self.question_no += 1 #αυξάνω κατά 1
+        q_text = self.current_question.question_text
+        #επιστρέφω μορφοποιημένα πχ. Νο 1(+..) και δίπλα την κάθε ερώτηση
+        return f"No.{self.question_no}: {q_text}"
+    
+    def prv_question(self):
+
+    
+        #παίρνω την ερώτηση απο λίστα
+        self.current_question = self.questions[self.question_no-2]
+        self.question_no -= 1 #μειώνω κατά 1
+        q_text = self.current_question.question_text
+        
+        #επιστρέφω μορφοποιημένα πχ. Νο 1(-..) και δίπλα την κάθε ερώτηση
+        return f"No.{self.question_no}: {q_text}"
+
+    def check_answer(self, user_answer):
+        #ελέγχω αν η απάντηση του χρήστη είναι σωστή ή όχι
+        
+        correct_answer = self.current_question.correct_answer
+        if user_answer.lower() == correct_answer.lower():
+            self.score += 1 #κρατάω τη βαθμολογία
+            return True
+        else:
+            return False
+
+    def get_score(self):
+        #αφαιρώ απο το σύνολο των ερωτήσεων τις σωστές και βρίσκω τις λάθος        
+        wrong = self.question_no - self.score
+        # Μετατρέπω σε ποσοστό τις σωστές
+        score_percent = int(self.score / self.question_no * 100)
+        #επιστρέφω σωστές, λάθος και το ποσοστό
+        return (self.score, wrong, score_percent)
+        #return max(self.score, wrong, score_percent)
+    
+    def get_high_score(self):
+        try:
+           with open('score.dat', 'rb') as file:
+            score = pickle.load(file)
+        except:
+            score = 0
+
+        print("High score: %d" % score)
+
+#περιβάλλον του παιχνιδιού
+class QuizInterface:
+
+    def __init__(self, quiz: Quiz) -> None:
+        self.quiz = quiz
+        self.window = Tk()
+        self.window.title("Who is the smartest person ever?")
+        self.window.geometry("1240x620")
+        load=Image.open("triv1.jpg")
+        render= ImageTk.PhotoImage(load)
+        img=Label(self.window, image= render)
+        img.place(x=0, y=0)
+        self.wrongAnswers = 0
+        self.noAnswers = 0
+
+        # Τίτλος
+        self.display_title()    
+
+        
+        # δημιουργώ καμβά με δικές μου επιλογές 
+        self.canvas = Canvas(width=800, height=250, background='#F5F5F6',  highlightthickness='0')
+
+        self.timer = Label(self.window, pady=5, font=("Segoe UI", 18, "bold"), text="timer", background='#1565c0', fg='#ffffff', width=5)
+        self.timer.place(x=700, y=1)
+
+        self.question_text = self.canvas.create_text(400, 125, text="Question here", width=750, fill=COLOR, font=('Segoe UI', 20, 'bold'))
+        self.canvas.grid(row=4, column=2, columnspan=2, pady=50)
+        self.display_question()
+
+        # αποθηκεύω τις απαντήσεις του χρήστη
+        self.user_answer = StringVar()
+
+        # εμφάνιση 4 επιλογών
+        self.opts = self.radio_buttons()
+        self.display_options()
+
+        # μήνυμα αν είναι λάθος ή σωστή απάντηση
+        self.feedback = Label(self.window, pady=5, font=("Segoe UI", 18, "bold"), background='#F5F5F6', justify='center')
+        #Πού θα εμφανίζεται αντίστοιχο μήνυμα
+        self.feedback.place(x=200, y=450)
+
+        # κουμπιά προηγούμενη, επόμενη και τέλος
+        self.buttons()
+
+        def countdown(count):
+            # change text in label        
+            self.timer['text'] = count
+
+            if count > 0:
+                # call countdown again after 1000ms (1s)
+                self.window.after(1000, countdown, count-1)
+            else:
+                self.timer.config(bg='red')
+                self.timer["text"] = "Τελος χρονου"
+                self.display_result()
+                self.window.destroy()
+
+        countdown(180)
+
+        # κυρίως παράθυρο
+        self.window.mainloop()
+
+    def display_title(self):
+        # Τίτλος
+        title = Label(self.window, text="TRIVIAL", width=60, bg="#01579B", fg="#ffffff", font=("Segoe UI", 22, "bold"), justify='center')
+
+        # θέση τίτλου
+        title.place(x=0, y=1)
+
+    def display_question(self):
+        #Εμφάνιση ερώτησης
+        q_text = self.quiz.next_question()
+        self.canvas.itemconfig(self.question_text, text=q_text)
+        
+    def display_prv_question(self):
+        #Εμφάνιση ερώτησης
+        
+        q_text = self.quiz.prv_question()
+        self.canvas.itemconfig(self.question_text, text=q_text)
+
+    def radio_buttons(self):#κουμπιά επιλογών απάντησης
+        
+        # κενή λίστα επιλογών
+        choice_list = []
+
+        # θέση 1ης επιλογής
+        y_pos = 220
+
+        # προσθήκη επιλογών απάντησης
+        while len(choice_list) < 4:
+
+            # ιδιότητες επιλογής
+            radio_btn = Radiobutton(self.window, text="", variable=self.user_answer, value='', font=("Segoe UI", 18), background='#F5F5F6')
+
+            # προσθέτω την λίστα επιλογών στα κουμπιά
+            choice_list.append(radio_btn)
+
+            # τοποθέτηση κουμπιού
+            radio_btn.place(x=300, y=y_pos)
+
+            # μεταφορά του κουμπιού
+            y_pos += 40
+
+        # επιστρέφω τα κουμπιά επιλογών
+        return choice_list
+
+    def display_options(self):
+        #εμφάνιση 4 επιλογών
+
+        val = 0
+
+        # να μην εμφανίζω επιλεγμένη κάποια επιλογή
+        self.user_answer.set(None)
+
+        #επαναφορά επιλογών που θα εμφανιστούν στα κουμπιά
+        for option in self.quiz.current_question.choices:
+            self.opts[val]['text'] = option
+            self.opts[val]['value'] = option
+            val += 1
+
+    def next_btn(self):   
+
+        # αν η απάντηση είναι σωστή ή λάθος, τυπώνω αντίστοιχο μήνυμα
+        if self.quiz.check_answer(self.user_answer.get()):
+            if self.quiz.check_answer==None:
+                noAnswers+=1
+            else:
+                
+                self.feedback["fg"] = "green"
+                self.feedback["text"] = 'Σωστά! \U0001F44D'
+        else:
+            if self.quiz.check_answer==None:
+                noAnswers+=1
+            else:
+                self.wrongAnswers+=1
+                self.feedback['fg'] = 'red'
+                self.feedback['text'] =('\u274E\n'
+                                         f'Η σωστή απάντηση είναι: {self.quiz.current_question.correct_answer}')
+
+        if self.quiz.has_more_questions():
+            if (self.noAnswers >= 3):
+                # 3 Λάθος απαντήσεις
+                self.display_result()
+                # κλείνει την εφαρμογή
+                self.window.destroy()
+            
+            # πάει στην επόμενη
+            self.display_question()
+            self.display_options()
+        else:
+            # αλλιώς βγαίνει το αποτέλεσμα
+            self.display_result()
+
+            # κλείνει την εφαρμογή
+            self.window.destroy()
+
+    def prv_btn(self):
+        if self.quiz.check_answer(self.user_answer.get()):
+            self.feedback["fg"] = "green"
+            self.feedback["text"] = 'Σωστά! \U0001F44D'
+        else:
+            self.feedback['fg'] = 'red'
+            self.feedback['text'] =('\u274E\n'
+                                     f'Η σωστή απάντηση είναι: {self.quiz.current_question.correct_answer}')
+
+        if self.quiz.has_no_more_questions():
+            # πάει στην επόμενη
+            self.display_prv_question()
+            self.display_options()
+        else:
+            # αλλιώς βγαίνει το αποτέλεσμα
+            self.display_result()
+
+            # κλείνει την εφαρμογή
+            self.window.destroy()
+        
+        
+    pygame.mixer.init()       
+    def buttons(self):
+        pygame.mixer.music.load(r"Vangelis -01- Titles.mp3")
+        
+        pygame.mixer.music.play(loops=0)
+
+        # εμφάνιση κουμπιών προηγουμενο, επόμενο και τέλος
+
+        
+        prv_button = Button(self.window, text="Previous", command=self.prv_btn,
+                             width=10, bg="#002f6c", fg="white", font=("Segoe UI", 16, "bold"))
+        prv_button.place(x=25, y=460)
+
+      
+        next_button = Button(self.window, text="Next", command=self.next_btn,
+                             width=10, bg="#002f6c", fg="white", font=("Segoe UI", 16, "bold"))
+        next_button.place(x=785, y=460)
+
+        
+        quit_button = Button(self.window, text="Exit", command=self.window.destroy,
+                             width=10, bg="#d50000", fg="#ffffff", font=("Segoe UI", 16, " bold"))
+        quit_button.place(x=785, y=560)
+        
+
+    def display_result(self):
+        #εμφάνιση αποτελέσματος με πλαίσιο μηνυμάτων
+        correct, wrong, score_percent = self.quiz.get_score()
+
+        correct = f"Σωστές: {correct}"
+        wrong = f"Λάθος: {wrong}"
+
+        # ποσοστό σωστών απαντήσεων
+        result = f"Score: {score_percent}%"
+
+        # εμφανίζω τα αποτελέσματα
+        messagebox.showinfo("Αποτελέσματα", f"{result}\n{correct}\n{wrong}")
+
+#κενή λίστα
+question_bank = []
+# ανάλογα τις παραμέτρους που έδωσα στην αρχή
+for question in question_data:
+    #λίστα που περιέχει τη σωστή και τις λάθος απαντήσεις
+    choices = []
+    question_text = html.unescape(question["question"])
+    correct_answer = html.unescape(question["correct_answer"])
+    incorrect_answers = question["incorrect_answers"]
+    for ans in incorrect_answers:
+        choices.append(html.unescape(ans))
+    choices.append(correct_answer)
+    #ανακατέυω
+    shuffle(choices)
+    # αντικείμενο κλάσης Question
+    new_question = Question(question_text, correct_answer, choices)
+    question_bank.append(new_question)
+
+#αντικείμενο κλάσης Quiz
+quiz = Quiz(question_bank)
+#αντικείμενο κλάσης QuizInterface
+quiz_ui = QuizInterface(quiz)
+
+
+print("Ολοκληρώθηκε")
+print(name,f"το score σου είναι: {quiz.score}/{quiz.question_no}")
+#για 3 παίκτες
+score = 3;
+# save το score
+with open('score.dat', 'wb') as file:
+ pickle.dump(score, file)
+
